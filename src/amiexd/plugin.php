@@ -35,40 +35,93 @@ use amiexd\cmd\ClearLaggCommand;
 use amiexd\item\Boat as BoatItem;
 use amiexd\packet\PlayerInputPacket;
 use amiexd\entity\Boat;
+use amiexd\cmd\RestartMeCommand;
+use amiexd\task\AutoBroadcastTask;
+use amiexd\task\CheckMemoryTask;
+use amiexd\task\RestartServerTask;
 
 class plugin extends PluginBase implements Listener{
+	 const TYPE_NORMAL = 0;
+	 const TYPE_OVERLOADED = 1;
+	 public $timer = 0;
+	 public $paused = false;
     protected $exemptedEntities = [];
 	 public $drops = array();
-	 public $config;
+	 public $messagestask;
 	 
 	 public function onEnable(){
-		 @mkdir($this->getDataFolder());
-		 $this->config = (new Config($this->getDataFolder()."config.yml", Config::YAML, array(
-            "messages" => array(
-                "ลดความแลคเซิร์ฟ try /mts clearlag",
-                "ต้องการชื้อ VIP ติดต่อ ID Line: flukemts",
-                "พบเห็นใครเล่นลาวาหรือไฟมั่วแบนทันที!",
-                "พิมรัวแบน!",
-                "มีปัญหาไรแจ้งแอดมินครับ",
-                "ข้อความ3"
-            ),
-            "time" => "30",
-            "prefix" => "§bMts §eInfo§f",
-            "color" => "§f"
-        )))->getAll();
-      $time = intval($this->config["time"]) * 20;
-      $this->getServer()->getScheduler()->scheduleRepeatingTask(new SimpleMessagesTask($this), $time);
- Item::$list[333] = BoatItem::class;
+	Item::$list[333] = BoatItem::class;
     Item::addCreativeItem(new Item(333));
     $this->getServer()->addRecipe((new BigShapelessRecipe(Item::get(333, 0, 1)))->addIngredient(Item::get(Item::WOODEN_PLANK, null, 5))->addIngredient(Item::get(Item::WOODEN_SHOVEL, null, 1))); Entity::registerEntity("\\amiexd\\entity\\Boat", true);
     $this->getServer()->getNetwork()->registerPacket(0xae, PlayerInputPacket::class);
-		 $this->getServer()->getCommandMap()->register("mts", new ClearLaggCommand($this));
+		 $this->saveFiles();
+      $this->registerAll();
 		 $this->getServer()->getPluginManager()->registerEvents($this, $this);
 	}
 	
+	 private function saveFiles(){
+		 if(file_exists($this->getDataFolder()."config.yml")){
+			 if($this->getConfig()->get("version") !== $this->getDescription()->getVersion() or !$this->getConfig()->exists("version")){
+				 $this->getServer()->getLogger()->warning("An invalid configuration file for ".$this->getDescription()->getName()." was detected.");
+				 if($this->getConfig()->getNested("plugin.autoUpdate") === true){
+					 $this->saveResource("config.yml", true);
+					 $this->getServer()->getLogger()->warning("Successfully updated the configuration file for ".$this->getDescription()->getName()." to v".$this->getDescription()->getVersion().".");
+					}
+				}
+			}else{
+				 $this->saveDefaultConfig();
+				 $this->getServer()->getLogger()->warning("Remember to use a server restarter script, or else this plugin won't work properly.");
+			}
+			
+	}
+	 private function registerAll(){
+		 $this->setTime($this->getConfig()->getNested("restart.restartInterval") * 60);
+		/***commandmap***/
+		 $this->getServer()->getCommandMap()->register("mts", new ClearLaggCommand($this));
+		 $this->getServer()->getCommandMap()->register("restartme", new RestartMeCommand($this));
+		/***tasks***/
+		 $this->getServer()->getScheduler()->scheduleRepeatingTask(new AutoBroadcastTask($this), ($this->getConfig()->getNested("restart.broadcastInterval") * 20));
+		 if($this->getConfig()->getNested("restart.restartOnOverload") === true){
+			 $this->getServer()->getScheduler()->scheduleRepeatingTask(new CheckMemoryTask($this), 6000);
+			 $this->getServer()->getLogger()->notice("Memory overload restarts are enabled. If memory usage goes above ".$this->getMemoryLimit().", the server will restart.");
+			}else{
+				 $this->getServer()->getLogger()->notice("Memory overload restarts are disabled.");
+			}
+		 $this->getServer()->getScheduler()->scheduleRepeatingTask(new SimpleMessagesTask($this), 500);
+		 $this->getServer()->getScheduler()->scheduleRepeatingTask(new RestartServerTask($this), 20);
+		 //$messagetime = intval($this->messagestask["messagetime"]) * 20;
+
+	}
 	 public function onDisable(){
 	}
 	
+	 public function getTime(){
+		 return $this->timer;
+	}
+	 public function setTime($seconds){
+		 $this->timer = (int) $seconds;
+	}
+	 public function addTime($seconds){
+		 if(is_numeric($seconds)) $this->timer += (int) $seconds;
+	}
+	 public function subtractTime($seconds){
+		 if(is_numeric($seconds)) $this->timer -= (int) $seconds;
+	}
+	 public function isTimerPaused(){
+		 return $this->paused === true;
+	}
+	 public function setPaused($value = true){
+		 $this->paused = (bool) $value;
+	}
+	 public function getMemoryLimit(){
+		 return strtoupper($this->getConfig()->getNested("restart.memoryLimit"));
+	}
+	 public function getFormattedTime(){
+		 $hour = floor($this->getTime() / 3600);
+		 $minute = floor(($this->getTime() / 60) - ($hour * 60));
+		 $second = floor($this->getTime() % 60);
+		 return $hour." hr ".$minute." min ".$second." sec";
+	}
 	 public function PlayerDeath(PlayerDeathEvent $event){
 		 $player = $event->getEntity();
 		  $this->drops[$player->getName()][1] = $player->getInventory()->getArmorContents();
@@ -141,6 +194,42 @@ class plugin extends PluginBase implements Listener{
     }
   }
 
+  public function broadcastTime($messageType){
+        $message = str_replace("{RESTART_TIME}", $this->getTime(), $this->getConfig()->getNested("restart.countdownMessage"));
+        switch(strtolower($messageType)){
+            case "chat":
+                $this->getServer()->broadcastMessage($message);
+                break;
+            case "popup":
+                foreach($this->getServer()->getOnlinePlayers() as $player){
+                    $player->sendPopup($message);
+                }
+                break;
+            case "tip":
+                foreach($this->getServer()->getOnlinePlayers() as $player){
+                    $player->sendTip($message);
+                }
+                break;
+        }
+    }
+   
+    public function initiateRestart($mode){
+        switch($mode){
+            case self::TYPE_NORMAL:
+                foreach($this->getServer()->getOnlinePlayers() as $player){
+                    $player->close("", $this->getConfig()->getNested("restart.quitMessage"));
+                }
+                $this->getServer()->getLogger()->info($this->getConfig()->getNested("restart.quitMessage"));
+                break;
+            case self::TYPE_OVERLOADED:
+                foreach($this->getServer()->getOnlinePlayers() as $player){
+                    $player->close("", $this->getConfig()->getNested("restart.overloadQuitMessage"));
+                }
+                $this->getServer()->getLogger()->info($this->getConfig()->getNested("restart.overloadQuitMessage"));
+                break;
+        }
+        $this->getServer()->shutdown();
+    }
   public function onPacketReceived(DataPacketReceiveEvent $event){
     $packet = $event->getPacket();
     $player = $event->getPlayer();
@@ -191,5 +280,4 @@ class plugin extends PluginBase implements Listener{
     }
   }
 }
-
 

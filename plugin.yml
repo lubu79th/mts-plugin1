@@ -1,5 +1,5 @@
 name: mts-plugin1
-version: 1.0.4dev
+version: 1.0.5dev
 api:
 - 1.12.0
 - 1.13.0
@@ -18,3 +18,12 @@ permissions:
           mts.command.clearlag:
             default: true
             description: "Allows access to the MtsClearlag command."
+restartme:
+  default: op
+  children:
+   restartme.command:
+    default: op
+    children:
+     restartme.command.restartme:
+      default: op
+

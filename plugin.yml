@@ -1,5 +1,5 @@
 name: mts-plugin1
-version: 1.0.2dev
+version: 1.0.3dev
 api:
 - 1.12.0
 - 1.13.0

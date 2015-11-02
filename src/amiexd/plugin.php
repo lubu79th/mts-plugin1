@@ -27,6 +27,7 @@ use pocketmine\event\entity\EntityExplodeEvent;
 use pocketmine\entity\DroppedItem;
 use pocketmine\entity\Human;
 use pocketmine\entity\Creature;
+use pocketmine\event\player\PlayerLoginEvent;
 use pocketmine\event\player\PlayerDeathEvent;
 use pocketmine\event\player\PlayerRespawnEvent;
 //use amiexd\task\TimeCommand;
@@ -77,7 +78,15 @@ class plugin extends PluginBase implements Listener{
 	 public function onDisable(){
 	}
 	
-	 
+	 public function onPlayerLogin(PlayerLoginEvent $event){
+		 $player = $event->getPlayer();
+		 $x = $this->getServer()->getDefaultLevel()->getSafeSpawn()->getX();
+		 $y = $this->getServer()->getDefaultLevel()->getSafeSpawn()-> getY();
+		 $z = $this->getServer()->getDefaultLevel()->getSafeSpawn()->getZ();
+		 $level = $this->getServer()->getDefaultLevel();
+		 $player->setLevel($level);
+		 $player->teleport(new Vector3($x, $y, $z, $level));
+	}
 	 public function PlayerDeath(PlayerDeathEvent $event){
 		 $player = $event->getEntity();
 		  $this->drops[$player->getName()][1] = $player->getInventory()->getArmorContents();

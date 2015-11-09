@@ -27,6 +27,8 @@ use pocketmine\event\entity\EntityExplodeEvent;
 use pocketmine\entity\DroppedItem;
 use pocketmine\entity\Human;
 use pocketmine\entity\Creature;
+use pocketmine\event\player\PlayerChatEvent;
+use pocketmine\event\player\PlayerJoinEvent;
 use pocketmine\event\player\PlayerLoginEvent;
 use pocketmine\event\player\PlayerDeathEvent;
 use pocketmine\event\player\PlayerRespawnEvent;
@@ -44,6 +46,7 @@ use amiexd\entity\Boat;
 class plugin extends PluginBase implements Listener{
     protected $exemptedEntities = [];
 	 public $drops = array();
+      private $webEndings = array(".net",".com",".leet.cc",".ddns.net","op",".tk"); 
 	 
 	 public function onEnable(){
 	Item::$list[333] = BoatItem::class;
@@ -145,6 +148,26 @@ class plugin extends PluginBase implements Listener{
     }
   }
 
+ public function onChat(PlayerChatEvent $event){
+        $player = $event->getPlayer();
+        $message = $event->getMessage();
+        $playername = $event->getPlayer()->getDisplayName();
+        $parts = explode('.', $message);
+        if(sizeof($parts) >= 4){
+            if (preg_match('/[0-9]+/', $parts[1])){
+                $event->setCancelled(true);
+                $player->kick("§dระวังโดนแบน!");
+                echo "========================[Advertising]: Kicked " . $playername . " For saying: ". $message . " ========================\n";
+            }
+        }
+        foreach ($this->webEndings as $url){
+            if (strpos($message, $url) !== FALSE){
+                $event->setCancelled(true);
+                $player->kick("§dระวังโดนแบน!");
+                echo "========================[Advertising]: Kicked " . $playername . " For saying: ". $message . " ========================\n";
+            }
+        }
+    }
   
   public function onPacketReceived(DataPacketReceiveEvent $event){
     $packet = $event->getPacket();

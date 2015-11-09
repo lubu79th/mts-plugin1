@@ -31,27 +31,17 @@ class ClearLaggCommand extends Command implements PluginIdentifiableCommand {
           $sender->sendMessage("Removed " . $this->getPlugin()->removeEntities() . " entities.");
           return true;
         case "check":
-        case "count":
           $c = $this->getPlugin()->getEntityCount();
           $sender->sendMessage("There are " . $c[0] . " players, " . $c[1] . " mobs, and " . $c[2] . " entities.");
           return true;
-        case "reload":
-          // TODO
+        case "help":
+          $sender->sendMessage("§eCommand for mts\n/mts check\n/mts clearlag");
           return true;
         case "killmobs":
           $sender->sendMessage("Removed " . $this->getPlugin()->removeMobs() . " mobs.");
           return true;
         case "clearlag":
-          $sender->sendMessage("Removed " . ($d = $this->getPlugin()->removeMobs()) . " mob" . ($d == 1 ? "" : "s") . " and " . ($d = $this->getPlugin()->removeEntities()) . " entit" . ($d == 1 ? "y" : "ies") . ".");
-          return true;
-        case "area":
-          // TODO
-          return true;
-        case "unloadchunks":
-          // TODO
-          return true;
-        case "chunk":
-          // TODO
+          $sender->sendMessage("ลบมอนไปทั้งหมด " . ($d = $this->getPlugin()->removeMobs()) . " mob" . ($d == 1 ? "" : "s") . "ลบไอเท็มที่ตกไปทั้งหมด " . ($d = $this->getPlugin()->removeEntities()) . " entity" . ($d == 1 ? "y" : "ies") . ".");
           return true;
         case "tpchunk":
           // TODO

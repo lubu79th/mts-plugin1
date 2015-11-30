@@ -2,7 +2,7 @@
 namespace amiexd;
 
 use pocketmine\Player;
-use pocketmine\Serve;
+use pocketmine\Server;
 use pocketmine\level\Level;
 use pocketmine\block\Block;
 use pocketmine\entity\Entity;
@@ -22,16 +22,19 @@ use pocketmine\event\server\DataPacketReceiveEvent;
 use pocketmine\network\protocol\InteractPacket;
 use pocketmine\network\protocol\SetEntityLinkPacket;
 use pocketmine\network\protocol\MovePlayerPacket;
-use pocketmine\event\player\PlayerQuitEvent;
 use pocketmine\event\entity\EntityExplodeEvent;
 use pocketmine\entity\DroppedItem;
 use pocketmine\entity\Human;
 use pocketmine\entity\Creature;
 use pocketmine\event\player\PlayerChatEvent;
 use pocketmine\event\player\PlayerJoinEvent;
+use pocketmine\event\player\PlayerQuitEvent;
 use pocketmine\event\player\PlayerLoginEvent;
 use pocketmine\event\player\PlayerDeathEvent;
 use pocketmine\event\player\PlayerRespawnEvent;
+use pocketmine\event\player\PlayerDropItemEvent;
+use pocketmine\level\particle\FloatingTextParticle;
+use pocketmine\scheduler\CallbackTask;
 //use amiexd\task\TimeCommand;
 //use amiexd\task\SimpleMessagesTask;
 use amiexd\cmd\ClearLaggCommand;
@@ -46,7 +49,8 @@ use amiexd\entity\Boat;
 class plugin extends PluginBase implements Listener{
     protected $exemptedEntities = [];
 	 public $drops = array();
-      private $webEndings = array(".net",".com",".leet.cc",".ddns.net","op",".tk"); 
+	 private $function_a1, $timer, $target, $EconomyS, $Kill, $killrate;
+    private $webEndings = array(".net",".com",".leet.cc",".ddns.net","op",".tk"); 
 	 
 	 public function onEnable(){
 	Item::$list[333] = BoatItem::class;
@@ -54,8 +58,15 @@ class plugin extends PluginBase implements Listener{
     $this->getServer()->addRecipe((new BigShapelessRecipe(Item::get(333, 0, 1)))->addIngredient(Item::get(Item::WOODEN_PLANK, null, 5))->addIngredient(Item::get(Item::WOODEN_SHOVEL, null, 1))); Entity::registerEntity("\\amiexd\\entity\\Boat", true);
     $this->getServer()->getNetwork()->registerPacket(0xae, PlayerInputPacket::class);
 		 //$this->saveFiles();
+		 $this->reloadConfig();
+		 $this->dropitemworld = $this->getConfig()->get("dropitemworld"); 
+		 $this->saveDefaultConfig();
       $this->registerAll();
 		 $this->getServer()->getPluginManager()->registerEvents($this, $this);
+		 $this->EconomyS = $this->getServer()->getPluginManager()->getPlugin("EconomyAPI");
+		 $this->killrate = $this->getServer()->getPluginManager()->getPlugin("KillRate");
+		 $this->getServer()->getScheduler()->scheduleRepeatingTask(new CallbackTask(array($this,"gui1")),10);
+		 $this->timer = 0;
 	}
 	
 		
@@ -64,9 +75,33 @@ class plugin extends PluginBase implements Listener{
 		 $this->getServer()->getCommandMap()->register("mts", new ClearLaggCommand($this));
 		/***tasks***/
 	}
+	 public function gui1(){
+		 foreach($this->getServer()->getOnlinePlayers() as $p){
+                $tps = $this->getServer()->getTicksPerSecond();
+			 $pName = $p->getPlayer()->getName();
+			 $pMoney = $this->EconomyS->mymoney($pName);
+			 $pOnline = count(Server::getInstance()->getOnlinePlayers());
+			 $pFull = Server::getInstance()->getMaxPlayers();
+			 $score = $this->killrate->getScore($pName);
+			 /*$p->sendTip("                                            §bMts§a-§cSurvival§f: TPS[$tps]\n
+§eyou§f: $pName\n                                                  §emoney§f: $pMoney\n                                                 §eonline§f: $pOnline\n                                                   §ekills§f: $score\n                                                                                                     §a-------------------"  ) ;*/
+                $p->sendTip("                                                §bMts§a-§cSurvival§f:§aTPS§f[$tps] \n                                                        §eyou: $pName\n                                                         §eplayers: $pOnline\n                                                         §ekills: $score\n                                                         §emoney: $pMoney\n                                                 §a------------------------"  ) ;
+		}
+	}
 	 public function onDisable(){
 	}
 	
+	/*** Event ***/
+	
+	 public function onDrop(PlayerDropItemEvent $event){
+		 $player = $event->getPlayer();
+		 if(!$player->isOp()){
+			 if(in_array($player->getLevel()->getName(), $this->dropitemworld)){ 
+				 $player->sendMessage("§c[Error]§f คุณไม่สามารถทิ้งไอเท็มบนโลกนี้ได้");
+			   $event->setCancelled();
+			}
+		}
+	}
 	 public function onPlayerLogin(PlayerLoginEvent $event){
 		 $player = $event->getPlayer();
 		 $x = $this->getServer()->getDefaultLevel()->getSafeSpawn()->getX();
@@ -76,24 +111,7 @@ class plugin extends PluginBase implements Listener{
 		 $player->setLevel($level);
 		 $player->teleport(new Vector3($x, $y, $z, $level));
 	}
-	 public function PlayerDeath(PlayerDeathEvent $event){
-		 $player = $event->getEntity();
-		  $this->drops[$player->getName()][1] = $player->getInventory()->getArmorContents();
-		  $this->drops[$player->getName()][0] = $player->getInventory()->getContents();
-		  $event->setDrops(array());
-		  $player->teleport($player->getLevel()->getSpawn());
-	}
-	 public function PlayerRespawn(PlayerRespawnEvent $event){
-		 $player = $event->getPlayer();
-		 if (isset($this->drops[$player->getName()])) {
-			 $player->getInventory()->setContents($this->drops[$player->getName()][0]);
-			 $player->getInventory()->setArmorContents($this->drops[$player->getName()][1]);
-			 unset($this->drops[$player->getName()]);
-			}
-	}
-	/*
-	 * ลบไอเท็ม $item
-	*/
+
 	 public function removeEntities(){
 		 $i = 0;
 		 foreach($this->getServer()->getLevels() as $level){
@@ -106,9 +124,7 @@ class plugin extends PluginBase implements Listener{
 		}
 		 return $i;
 	}
-	/*
-	* ลบมอน $entity
-	*/
+	
 	 public function removeMobs(){
 		 $i = 0;
 		 foreach($this->getServer()->getLevels() as $level){
@@ -157,14 +173,14 @@ class plugin extends PluginBase implements Listener{
             if (preg_match('/[0-9]+/', $parts[1])){
                 $event->setCancelled(true);
                 $player->kick("§dระวังโดนแบน!");
-                echo "========================[Advertising]: Kicked " . $playername . " For saying: ". $message . " ========================\n";
+                echo "[Advertising]: Kicked " . $playername . " For saying: ". $message . " \n";
             }
         }
         foreach ($this->webEndings as $url){
             if (strpos($message, $url) !== FALSE){
                 $event->setCancelled(true);
                 $player->kick("§dระวังโดนแบน!");
-                echo "========================[Advertising]: Kicked " . $playername . " For saying: ". $message . " ========================\n";
+                echo "[Advertising]: Kicked " . $playername . " For saying: ". $message . " \n";
             }
         }
     }

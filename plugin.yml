@@ -1,20 +1,24 @@
-name: mts-plugin1
-version: 1.0.5
-api:
-- 1.12.0
-- 1.13.0
+name: meowPlugin
+version: fix
+api: [3.0.0-ALPHA3, 3.0.0-ALPHA4]
 author: AmieXD
 main: amiexd\plugin
 description: "ปลั้กอินเสริม"
 permissions:
   mts:
     default: false
-    description: "Allows access to all MTS features."
+    description: "Allows access to all features."
     children:
+      mts.timeitem:
+        description: Allows players to receive random items.
+        default: true
       mts.command:
         default: true
-        description: "Allows access to all MTS commands."
+        description: "Allows access to all commands."
         children:  
           mts.command.clearlag:
             default: true
-            description: "Allows access to the MtsClearlag command."
+            description: "Allows access to the ClearLAG"
+          mts.command.buyenchant:
+            default: true
+            description: "Allows access to the ClearLAG"
